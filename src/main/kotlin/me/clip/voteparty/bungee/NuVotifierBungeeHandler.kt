@@ -1,7 +1,6 @@
 package me.clip.voteparty.bungee
 
 import com.google.gson.Gson
-import com.vexsoftware.votifier.model.Vote
 import me.clip.voteparty.base.Addon
 import me.clip.voteparty.base.State
 import me.clip.voteparty.conf.sections.HookSettings
@@ -56,8 +55,14 @@ internal class NuVotifierBungeeHandler(override val plugin: VotePartyPlugin) : A
             return
         }
 
-        val player = party.usersHandler[vote.username]?.player() ?: server.getOfflinePlayer(vote.username)
-        val event = VoteReceivedEvent(player, vote.serviceName)
-        server.pluginManager.callEvent(event)
+        // Runs on separated thread for mojang uuid player check
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, Runnable {
+            val player = party.usersHandler[vote.username]?.player() ?: server.getOfflinePlayer(vote.username)
+            val event = VoteReceivedEvent(player, vote.serviceName)
+
+            Bukkit.getScheduler().runTask(plugin, Runnable {
+                server.pluginManager.callEvent(event)
+            })
+        })
     }
 }
