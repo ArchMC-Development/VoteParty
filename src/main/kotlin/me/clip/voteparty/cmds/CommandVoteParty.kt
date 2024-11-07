@@ -7,6 +7,7 @@ import co.aikar.commands.annotation.CommandCompletion
 import co.aikar.commands.annotation.CommandPermission
 import co.aikar.commands.annotation.Default
 import co.aikar.commands.annotation.Description
+import co.aikar.commands.annotation.Name
 import co.aikar.commands.annotation.Optional
 import co.aikar.commands.annotation.Subcommand
 import co.aikar.commands.annotation.Syntax
@@ -18,8 +19,11 @@ import me.clip.voteparty.conf.sections.VoteSettings
 import me.clip.voteparty.events.VoteReceivedEvent
 import me.clip.voteparty.exte.ADMIN_PERM
 import me.clip.voteparty.exte.CLAIM_PERM
+import me.clip.voteparty.exte.deserialize
 import me.clip.voteparty.exte.helpMenu
+import me.clip.voteparty.exte.msgAsString
 import me.clip.voteparty.exte.sendMessage
+import me.clip.voteparty.leaderboard.LeaderboardType
 import me.clip.voteparty.messages.Messages
 import me.clip.voteparty.plugin.VotePartyPlugin
 import net.kyori.adventure.identity.Identity
@@ -27,32 +31,56 @@ import org.bukkit.OfflinePlayer
 import org.bukkit.entity.Player
 import java.util.*
 import java.util.concurrent.TimeUnit
+import kotlin.text.StringBuilder
 
 @CommandAlias("%vp")
 internal class CommandVoteParty(override val plugin: VotePartyPlugin) : BaseCommand(), Addon
 {
 
 	@Subcommand("addvote")
-	@Syntax("<amount> [player]")
-	@Description("Add Vote")
+	@Syntax("<player> <silent> [amount]")
+	@Description("Add a vote to a player with the ability to trigger or not the rewards.")
 	@CommandPermission(ADMIN_PERM)
-	fun addVote(issuer: CommandIssuer, @Default("1") amount: Int, @Optional name: String?)
+	fun addVote(
+		issuer: CommandIssuer,
+		@Name("target") target: String,
+		@Name("silent") @Default("false") silent: Boolean,
+		@Name("amount") @Optional @Default("1") amount: Int
+    ) {
+
+        if (amount <= 0)
+        {
+            return sendMessage(issuer, Messages.ERROR__INVALID_NUMBER)
+        }
+
+        val user = party.usersHandler[target] ?: return sendMessage(issuer, Messages.ERROR__USER_NOT_FOUND)
+
+		if (silent)
+		{
+            repeat(amount) {
+                user.voted()
+            }
+
+            return sendMessage(issuer, Messages.VOTES__ADDED_TO_PLAYER, user.player(), "{count}", amount)
+		}
+
+        repeat(amount) {
+            plugin.server.pluginManager.callEvent(VoteReceivedEvent(user.player(), ""))
+        }
+
+        return sendMessage(issuer, Messages.VOTES__ADDED_TO_PLAYER, user.player(), "{count}", amount)
+	}
+
+	@Subcommand("addpartyvote")
+	@Syntax("<amount>")
+	@Description("Add a Vote to the party")
+	@CommandPermission(ADMIN_PERM)
+	fun addPartyVote(issuer: CommandIssuer, @Default("1") amount: Int)
 	{
 
 		if (amount <= 0)
 		{
 			return sendMessage(issuer, Messages.ERROR__INVALID_NUMBER)
-		}
-
-		if (!name.isNullOrEmpty())
-		{
-			val user = party.usersHandler[name] ?: return sendMessage(issuer, Messages.ERROR__USER_NOT_FOUND)
-
-			repeat(amount) {
-				server.pluginManager.callEvent(VoteReceivedEvent(user.player(), ""))
-			}
-
-			return sendMessage(issuer, Messages.VOTES__ADDED_TO_PLAYER, user.player(), "{count}", amount)
 		}
 
 		party.votesHandler.addVotes(amount)
@@ -94,6 +122,67 @@ internal class CommandVoteParty(override val plugin: VotePartyPlugin) : BaseComm
 		sendMessage(issuer, Messages.VOTES__VOTES_NEEDED_UPDATED)
 	}
 
+	@Subcommand("top")
+	@Syntax("<type> [page]")
+	@Description("List top voters")
+	@CommandPermission("voteparty.top")
+	fun top(issuer: CommandIssuer, type: LeaderboardType, @Default("1") page: Int)
+	{
+		if (page <= 0)
+		{
+			return sendMessage(issuer, Messages.ERROR__INVALID_NUMBER)
+		}
+
+
+		val leaderboard = party.leaderboardHandler.getLeaderboard(type)
+			?: return sendMessage(issuer, Messages.ERROR__LEADERBOARD_NOT_FOUND, null, "{type}", type.displayName)
+
+		val pages = leaderboard.data.chunked(10)
+		if (page > pages.size)
+		{
+			return sendMessage(issuer, Messages.ERROR__INVALID_PAGE_NUMBER, null, "{max}", pages.size.toString())
+		}
+
+		val actualPage = pages[page - 1]
+		if (actualPage.isEmpty())
+		{
+			return sendMessage(issuer, Messages.ERROR__INVALID_PAGE_NUMBER, null, "{max}", pages.size.toString())
+		}
+
+
+
+		val message = StringBuilder()
+		message.appendLine(
+			msgAsString(issuer, Messages.TOP__HEADER)
+				.replace("{type}", type.displayName)
+				.replace("{page}", page.toString())
+				.replace("{total}", pages.size.toString())
+		)
+
+		message.appendLine()
+
+		for ((index, leaderboardUser) in actualPage.withIndex()) {
+			message.appendLine(
+				msgAsString(issuer, Messages.TOP__LINE)
+					.replace("{position}", (index + 1).toString())
+					.replace("{player}", leaderboardUser.user.name)
+					.replace("{uuid}", leaderboardUser.user.uuid.toString())
+					.replace("{votes}", leaderboardUser.votes.toString())
+			)
+		}
+
+		message.appendLine()
+
+		message.append(
+			msgAsString(issuer, Messages.TOP__FOOTER)
+				.replace("{type}", type.displayName)
+				.replace("{page}", page.toString())
+				.replace("{total}", pages.size.toString())
+		)
+
+		party.audiences().sender(issuer.getIssuer()).sendMessage(Identity.nil(), deserialize(message.toString()))
+	}
+
 	@Subcommand("checkvotes")
 	@Syntax("<player> <amount> <timeunit>")
 	@CommandCompletion("@online")
@@ -101,7 +190,7 @@ internal class CommandVoteParty(override val plugin: VotePartyPlugin) : BaseComm
 	@CommandPermission(ADMIN_PERM)
 	fun checkVotes(issuer: CommandIssuer, offlinePlayer: OfflinePlayer, amount: Long, unit: TimeUnit)
 	{
-		val count = party.usersHandler.getVotesWithinRange(offlinePlayer, amount, unit)
+		val count = party.usersHandler.getVoteCountSince(offlinePlayer, amount, unit)
 		sendMessage(
 			issuer,
 			Messages.INFO__PLAYER_CHECK_VOTES,

@@ -7,11 +7,15 @@ import me.clip.voteparty.conf.sections.PartySettings
 import me.clip.voteparty.conf.sections.VoteData
 import me.clip.voteparty.conf.sections.VoteSettings
 import me.clip.voteparty.exte.formMessage
+import me.clip.voteparty.exte.sendMessage
 import me.clip.voteparty.exte.takeRandomly
 import me.clip.voteparty.leaderboard.LeaderboardType
+import me.clip.voteparty.messages.Messages
 import me.clip.voteparty.plugin.VotePartyPlugin
 import me.clip.voteparty.version.EffectType
+import org.bukkit.Bukkit
 import org.bukkit.entity.Player
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 class VotesHandler(override val plugin: VotePartyPlugin) : Addon, State
@@ -102,7 +106,7 @@ class VotesHandler(override val plugin: VotePartyPlugin) : Addon, State
 			return
 		}
 
-		settings.daily.entries.filter { entry -> entry.votes == party.usersHandler.getVotesSince(player, LeaderboardType.DAILY.time.invoke()) }.forEach { entry ->
+		settings.daily.entries.filter { entry -> entry.votes == party.usersHandler.getVoteCountSince(player, LeaderboardType.DAILY.start.invoke()) }.forEach { entry ->
 			entry.commands.forEach()
 			{ command ->
 				server.dispatchCommand(server.consoleSender, formMessage(player, command))
@@ -119,7 +123,7 @@ class VotesHandler(override val plugin: VotePartyPlugin) : Addon, State
 			return
 		}
 
-		settings.weekly.entries.filter { entry -> entry.votes == party.usersHandler.getVotesSince(player, LeaderboardType.WEEKLY.time.invoke()) }.forEach { entry ->
+		settings.weekly.entries.filter { entry -> entry.votes == party.usersHandler.getVoteCountSince(player, LeaderboardType.WEEKLY.start.invoke()) }.forEach { entry ->
 			entry.commands.forEach()
 			{ command ->
 				server.dispatchCommand(server.consoleSender, formMessage(player, command))
@@ -136,7 +140,7 @@ class VotesHandler(override val plugin: VotePartyPlugin) : Addon, State
 			return
 		}
 
-		settings.monthly.entries.filter { entry -> entry.votes == party.usersHandler.getVotesSince(player, LeaderboardType.MONTHLY.time.invoke()) }.forEach { entry ->
+		settings.monthly.entries.filter { entry -> entry.votes == party.usersHandler.getVoteCountSince(player, LeaderboardType.MONTHLY.start.invoke()) }.forEach { entry ->
 			entry.commands.forEach()
 			{ command ->
 				server.dispatchCommand(server.consoleSender, formMessage(player, command))
@@ -153,7 +157,7 @@ class VotesHandler(override val plugin: VotePartyPlugin) : Addon, State
 			return
 		}
 
-		settings.yearly.entries.filter { entry -> entry.votes == party.usersHandler.getVotesSince(player, LeaderboardType.ANNUALLY.time.invoke()) }.forEach { entry ->
+		settings.yearly.entries.filter { entry -> entry.votes == party.usersHandler.getVoteCountSince(player, LeaderboardType.ANNUALLY.start.invoke()) }.forEach { entry ->
 			entry.commands.forEach()
 			{ command ->
 				server.dispatchCommand(server.consoleSender, formMessage(player, command))
@@ -170,7 +174,7 @@ class VotesHandler(override val plugin: VotePartyPlugin) : Addon, State
 			return
 		}
 
-		settings.total.entries.filter { entry -> entry.votes == party.usersHandler.getVotesSince(player, LeaderboardType.ALLTIME.time.invoke()) }.forEach { entry ->
+		settings.total.entries.filter { entry -> entry.votes == party.usersHandler.getVoteCountSince(player, LeaderboardType.ALLTIME.start.invoke()) }.forEach { entry ->
 			entry.commands.forEach()
 			{ command ->
 				server.dispatchCommand(server.consoleSender, formMessage(player, command))
@@ -256,6 +260,21 @@ class VotesHandler(override val plugin: VotePartyPlugin) : Addon, State
 		settings.commands.forEach()
 		{ command ->
 			server.dispatchCommand(server.consoleSender, formMessage(player, command))
+		}
+	}
+
+	fun sendVoteReminders()
+	{
+		val players = Bukkit.getOnlinePlayers().filter {
+			party.usersHandler.getVoteCountSince(
+				it,
+				party.conf().getProperty(VoteSettings.REMINDER_INTERVAL).toLong(),
+				TimeUnit.HOURS
+			) < party.conf().getProperty(VoteSettings.REMINDER_THRESHOLD)
+		}
+
+		players.forEach {
+			sendMessage(party.manager().getCommandIssuer(it), Messages.VOTES__REMINDER)
 		}
 	}
 	
