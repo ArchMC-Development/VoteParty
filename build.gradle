@@ -54,7 +54,7 @@ allprojects {
 	}
 
 	compileKotlin {
-		kotlinOptions.jvmTarget = JavaVersion.VERSION_17
+		kotlinOptions.jvmTarget = JavaVersion.VERSION_21
 		kotlinOptions.javaParameters = true
 	}
 }
