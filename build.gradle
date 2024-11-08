@@ -39,7 +39,7 @@ allprojects {
 		mitLicense()
 
 		javaVersions {
-			target(21)
+			target(17)
 		}
 
 		github("darbyjack", "voteparty") {
@@ -54,7 +54,7 @@ allprojects {
 	}
 
 	compileKotlin {
-		kotlinOptions.jvmTarget = JavaVersion.VERSION_21
+		kotlinOptions.jvmTarget = JavaVersion.VERSION_17
 		kotlinOptions.javaParameters = true
 	}
 }
@@ -80,7 +80,7 @@ shadowJar {
 dependencies {
 
 	// paper
-	compileOnly "io.papermc.paper:paper-api:1.20.6-R0.1-SNAPSHOT"
+	compileOnly "io.papermc.paper:paper-api:1.20.1-R0.1-SNAPSHOT"
 
 	//
 	compileOnly "org.spigotmc:spigot-api:1.20.6-R0.1-SNAPSHOT"

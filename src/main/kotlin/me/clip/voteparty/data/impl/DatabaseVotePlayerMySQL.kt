@@ -67,11 +67,11 @@ internal class DatabaseVotePlayerMySQL(override val plugin: VotePartyPlugin) : D
     {
         return try
         {
-            val row = database.getFirstRow("SELECT name, claimable FROM voteparty_players WHERE uuid = ?", uuid.toString())
+            val row = database.getFirstRow("SELECT name, claimable FROM voteparty_players WHERE uuid = ?", uuid.toString());
             val user = User(uuid, row.getString("name"), mutableListOf(), row.getInt("claimable"))
 
             database.getResults("SELECT timestamp FROM voteparty_votes WHERE uuid = ?", uuid.toString()).forEach { vote ->
-                val stamp : BigInteger = vote.get("timestamp")
+                val stamp: BigInteger = vote.get("timestamp") as? BigInteger ?: BigInteger.ZERO
                 user.voted(stamp.toLong())
             }
             user
