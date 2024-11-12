@@ -56,7 +56,11 @@ internal class NuVotifierBungeeHandler(override val plugin: VotePartyPlugin) : A
             return
         }
 
-        val player = party.usersHandler[vote.username]?.player() ?: server.getOfflinePlayer(vote.username)
+        // pr #69 - Use paper's Server#getOfflinePlayerIfCached
+        val player = party.usersHandler[vote.username]?.player()
+            ?: server.getOfflinePlayerIfCached(vote.username)
+            ?: return plugin.logger.warning("A vote came through NuVotifier (username: ${vote.username}) which did not match any known players. Throwing away.")
+
         val event = VoteReceivedEvent(player, vote.serviceName)
         server.pluginManager.callEvent(event)
     }
