@@ -1,3 +1,11 @@
+<h2>
+  -=[warning]=-
+
+  this fork is not stable inside of a production environment at this time, use at your own risk.
+</h2>
+
+
+
 <img src="https://i.imgur.com/515YfKH.png">
 <h1 align="center">Welcome to VoteParty 👋</h1>
 <p>
